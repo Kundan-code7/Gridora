@@ -9,7 +9,8 @@ import {
   ChevronDown,
   Search,
   X,
-  Navigation
+  Navigation,
+  Siren
 } from 'lucide-react';
 
 export function Header({ 
@@ -21,7 +22,8 @@ export function Header({
   activeNotificationCount,
   selectedZone,
   onChangeZone,
-  zones = []
+  zones = [],
+  onOpenUrgent
 }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
@@ -296,6 +298,17 @@ export function Header({
           </div>
 
           {/* Provider: List Resource button */}
+          {currentRole === 'seeker' && (
+            <button
+              className="urgent-action-btn"
+              onClick={onOpenUrgent}
+              title="Find the fastest available hospitality resource"
+            >
+              <Siren size={15} />
+              <span>URGENT</span>
+            </button>
+          )}
+
           {currentRole === 'provider' && (
             <button 
               className="btn-primary-red" 

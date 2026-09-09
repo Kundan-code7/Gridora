@@ -2,70 +2,27 @@
 // Automatically tries gemini-3.5-flash, gemini-flash-latest, and gemini-pro-latest
 
 export class GeminiService {
-  static getApiKey() {
-    return localStorage.getItem('hre_gemini_api_key') || import.meta.env?.VITE_GEMINI_API_KEY || '';
-  }
-
-  static setApiKey(newKey) {
-    if (newKey) {
-      localStorage.setItem('hre_gemini_api_key', newKey.trim());
-    } else {
-      localStorage.removeItem('hre_gemini_api_key');
-    }
-  }
-
   /**
-   * Resilient execute with automatic model fallback
+   * Send prompts to the same-origin server function so Gemini credentials
+   * never enter the browser bundle or local storage.
    */
   static async callGemini(prompt, isJson = false) {
-    const apiKey = this.getApiKey();
-    const candidateModels = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-pro-latest'];
-    let lastError = null;
+    try {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, isJson })
+      });
+      const data = await response.json().catch(() => ({}));
 
-    for (const model of candidateModels) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const bodyPayload = {
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3
-          }
-        };
-
-        if (isJson) {
-          bodyPayload.generationConfig.responseMimeType = 'application/json';
-        }
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyPayload)
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data?.error?.message || `HTTP ${response.status}`);
-        }
-
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          return {
-            success: true,
-            modelUsed: model,
-            text
-          };
-        }
-      } catch (err) {
-        lastError = err;
-        console.warn(`Gemini model ${model} failed, trying fallback:`, err.message);
+      if (!response.ok || !data.success) {
+        return { success: false, error: 'Gemini service is currently unavailable.' };
       }
-    }
 
-    return {
-      success: false,
-      error: lastError?.message || 'All Gemini models failed'
-    };
+      return data;
+    } catch {
+      return { success: false, error: 'Gemini service is currently unavailable.' };
+    }
   }
 
   /**
@@ -217,6 +174,11 @@ Analyze the requirement and return ONLY a valid JSON object:
   "detectedCategory": "all | banquet | kitchen | parking | furniture | av | vehicles",
   "maxPrice": number or null,
   "requiresUrgent": boolean,
+  "requestedQuantity": number or null,
+  "requestedLocation": "location or null",
+  "requiredDate": "date or null",
+  "requiredTime": "time window or null",
+  "specialRequirements": ["short requirement"] or [],
   "summary": "Short 1-sentence interpretation of what seeker needs",
   "recommendedListingIds": ["list of matching listing ids ranked by fit"],
   "aiAdvice": "Brief advice for the seeker on booking this hospitality resource",
@@ -237,6 +199,11 @@ Analyze the requirement and return ONLY a valid JSON object:
       detectedCategory: 'all',
       maxPrice: null,
       requiresUrgent: queryText.toLowerCase().includes('urgent'),
+      requestedQuantity: Number(queryText.match(/\b(\d{1,5})\b/)?.[1]) || null,
+      requestedLocation: null,
+      requiredDate: /tonight|today/i.test(queryText) ? 'today' : null,
+      requiredTime: /tonight/i.test(queryText) ? 'tonight' : null,
+      specialRequirements: queryText.match(/(?:with|including|need)\s+(.+)/i)?.[1]?.split(/,| and /i).map(item => item.trim()).filter(Boolean) || [],
       summary: `Searching available resources matching "${queryText}"`,
       matchHeadline: 'Your shortlist is taking shape',
       recommendedListingIds: availableListings.slice(0, 3).map(l => l.id),

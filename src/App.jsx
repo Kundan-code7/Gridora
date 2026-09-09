@@ -4,6 +4,7 @@ import { FilterBar } from './components/FilterBar';
 import { DiscoveryView } from './components/DiscoveryView';
 import { ListingDetailModal } from './components/ListingDetailModal';
 import { UrgentAILogisticsModal } from './components/UrgentAILogisticsModal';
+import { UrgentRequirementModal } from './components/UrgentRequirementModal';
 import { ProviderDashboard } from './components/ProviderDashboard';
 import { CreateListingModal } from './components/CreateListingModal';
 import { TransactionTrackerModal } from './components/TransactionTrackerModal';
@@ -38,6 +39,7 @@ export function App() {
   // Modals & Overlays
   const [selectedListingForModal, setSelectedListingForModal] = useState(null);
   const [aiLogisticsData, setAiLogisticsData] = useState(null); // { listing, request }
+  const [isUrgentRequirementOpen, setIsUrgentRequirementOpen] = useState(false);
   const [isCreateListingOpen, setIsCreateListingOpen] = useState(false);
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -90,6 +92,7 @@ export function App() {
         selectedZone={selectedZone}
         onChangeZone={setSelectedZone}
         zones={MUMBAI_ZONES}
+        onOpenUrgent={() => setIsUrgentRequirementOpen(true)}
       />
 
       {/* Conditional View by Role */}
@@ -130,6 +133,19 @@ export function App() {
       )}
 
       {/* PDP Listing Detail Modal */}
+      {isUrgentRequirementOpen && (
+        <UrgentRequirementModal
+          listings={listings}
+          selectedZone={selectedZone}
+          onClose={() => setIsUrgentRequirementOpen(false)}
+          onHoldCreated={handleHoldCreated}
+          onOpenLogistics={(listing, request) => {
+            setIsUrgentRequirementOpen(false);
+            setAiLogisticsData({ listing, request });
+          }}
+        />
+      )}
+
       {selectedListingForModal && (
         <ListingDetailModal
           listing={selectedListingForModal}
