@@ -1,4 +1,4 @@
-const candidateModels = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-pro-latest'];
+const candidateModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-pro-latest'];
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') {

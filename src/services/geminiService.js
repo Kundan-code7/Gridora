@@ -1,7 +1,42 @@
 // Gemini AI Service with Multi-Model Fallback and Real-Time Diagnostics
-// Automatically tries gemini-3.5-flash, gemini-flash-latest, and gemini-pro-latest
+// Uses the current Gemini Flash model through the server-side API route.
 
 export class GeminiService {
+  static normalizeRequirementResult(result, queryText, availableListings) {
+    const categoryText = String(result?.detectedCategory || queryText || '').toLowerCase();
+    const categoryAliases = [
+      ['furniture', ['furniture', 'chair', 'table', 'banquet ware', 'seating']],
+      ['banquet', ['venue', 'event space', 'ballroom']],
+      ['kitchen', ['kitchen', 'bakery', 'catering facility', 'commissary']],
+      ['parking', ['parking', 'valet', 'bay']],
+      ['av', ['av', 'audio', 'sound', 'speaker', 'video wall', 'staging']],
+      ['vehicles', ['vehicle', 'refrigerated', 'truck', 'fleet', 'cold chain']]
+    ];
+    const matchedCategory = categoryAliases.find(([, aliases]) =>
+      aliases.some(alias => categoryText.includes(alias))
+    )?.[0] || 'all';
+    const quantityFromQuery = Number(queryText.match(/\b(\d{1,5})\b/)?.[1]) || null;
+    const recommendedListingIds = Array.isArray(result?.recommendedListingIds)
+      ? result.recommendedListingIds.filter(id => availableListings.some(listing => listing.id === id))
+      : [];
+
+    return {
+      detectedCategory: matchedCategory,
+      maxPrice: Number(result?.maxPrice) || null,
+      requiresUrgent: Boolean(result?.requiresUrgent) || /urgent|immediately|tonight|today|asap/i.test(queryText),
+      requestedQuantity: Number(result?.requestedQuantity) || quantityFromQuery,
+      requestedLocation: result?.requestedLocation || null,
+      requiredDate: result?.requiredDate || null,
+      requiredTime: result?.requiredTime || null,
+      specialRequirements: Array.isArray(result?.specialRequirements) ? result.specialRequirements : [],
+      summary: result?.summary || `Searching available resources matching "${queryText}"`,
+      recommendedListingIds,
+      aiAdvice: result?.aiAdvice || 'Check the live availability of the strongest match and request an urgent hold.',
+      matchHeadline: result?.matchHeadline || 'Your urgent shortlist is ready',
+      nextBestMove: result?.nextBestMove || 'Open the strongest live match and check its availability.'
+    };
+  }
+
   /**
    * Send prompts to the same-origin server function so Gemini credentials
    * never enter the browser bundle or local storage.
@@ -189,27 +224,23 @@ Analyze the requirement and return ONLY a valid JSON object:
     const res = await this.callGemini(prompt, true);
     if (res.success) {
       try {
-        return JSON.parse(res.text);
+        return this.normalizeRequirementResult(JSON.parse(res.text), queryText, availableListings);
       } catch (e) {
         console.warn('JSON parse error in requirement output:', e);
       }
     }
 
-    return {
-      detectedCategory: 'all',
-      maxPrice: null,
+    return this.normalizeRequirementResult({
       requiresUrgent: queryText.toLowerCase().includes('urgent'),
       requestedQuantity: Number(queryText.match(/\b(\d{1,5})\b/)?.[1]) || null,
-      requestedLocation: null,
       requiredDate: /tonight|today/i.test(queryText) ? 'today' : null,
       requiredTime: /tonight/i.test(queryText) ? 'tonight' : null,
-      specialRequirements: queryText.match(/(?:with|including|need)\s+(.+)/i)?.[1]?.split(/,| and /i).map(item => item.trim()).filter(Boolean) || [],
       summary: `Searching available resources matching "${queryText}"`,
       matchHeadline: 'Your shortlist is taking shape',
       recommendedListingIds: availableListings.slice(0, 3).map(l => l.id),
       aiAdvice: 'Prioritize a listing with the right capacity, then confirm the live slot before coordinating your wider event plan.',
       nextBestMove: 'Open the strongest match and check its live availability.'
-    };
+    }, queryText, availableListings);
   }
 
   /**
