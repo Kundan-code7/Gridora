@@ -219,7 +219,9 @@ Analyze the requirement and return ONLY a valid JSON object:
   "requiresUrgent": boolean,
   "summary": "Short 1-sentence interpretation of what seeker needs",
   "recommendedListingIds": ["list of matching listing ids ranked by fit"],
-  "aiAdvice": "Brief advice for the seeker on booking this hospitality resource"
+  "aiAdvice": "Brief advice for the seeker on booking this hospitality resource",
+  "matchHeadline": "A memorable 3-7 word headline describing the best-fit search",
+  "nextBestMove": "One specific next action the seeker should take"
 }`;
 
     const res = await this.callGemini(prompt, true);
@@ -236,8 +238,10 @@ Analyze the requirement and return ONLY a valid JSON object:
       maxPrice: null,
       requiresUrgent: queryText.toLowerCase().includes('urgent'),
       summary: `Searching available resources matching "${queryText}"`,
+      matchHeadline: 'Your shortlist is taking shape',
       recommendedListingIds: availableListings.slice(0, 3).map(l => l.id),
-      aiAdvice: 'Check live calendar slots and place an atomic 15-minute hold to lock capacity immediately.'
+      aiAdvice: 'Prioritize a listing with the right capacity, then confirm the live slot before coordinating your wider event plan.',
+      nextBestMove: 'Open the strongest match and check its live availability.'
     };
   }
 
